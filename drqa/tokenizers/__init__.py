@@ -16,7 +16,7 @@ def set_default(key, value):
     global DEFAULTS
     DEFAULTS[key] = value
 
-
+from .ltp_tokenizer import LTPTokenizer
 from .corenlp_tokenizer import CoreNLPTokenizer
 from .regexp_tokenizer import RegexpTokenizer
 from .simple_tokenizer import SimpleTokenizer
@@ -29,6 +29,8 @@ except ImportError:
 
 
 def get_class(name):
+    if name == 'ltp':
+        return LTPTokenizer
     if name == 'spacy':
         return SpacyTokenizer
     if name == 'corenlp':
