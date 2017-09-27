@@ -10,6 +10,7 @@ import argparse
 import os
 import sys
 import json
+import random
 import time
 
 from multiprocessing import Pool
@@ -95,13 +96,6 @@ def process_dataset(data, tokenizer, workers=None):
     q_tokens = workers1.map(tokenize, data['questions'])
     workers1.close()
     workers1.join()
-    #for idx in range(len(data['questions'])):
-    #    question = data['questions'][idx]
-    #    context = data['contexts'][idx]
-    #    if len(question) == 0 or len(context) == 0:
-    #      continue
-    #    q_tokens.append(tokenize(question))
-    #    c_tokens.append(tokenize(context))
 
     print("tokenizing contexts ...")
     workers2 = make_pool(
@@ -125,7 +119,6 @@ def process_dataset(data, tokenizer, workers=None):
         ner =   c_tokens[data['qid2cid'][idx]]['ner']
         ans_tokens = []
         ans = data['answers'][idx]  # answer the text
-        print(ans)
         ans_start = data['contexts'][idx].find(ans)
         ans_end = ans_start + len(ans)
         found = find_answer(offsets, ans_start, ans_end)
@@ -170,6 +163,8 @@ in_file = os.path.join(args.data_dir, args.split + '.json')
 print('Loading dataset %s' % in_file, file=sys.stderr)
 dataset = load_dataset(in_file)
 
+random.shuffle(dataset)
+
 out_file = os.path.join(
     args.out_dir, '%s-processed-%s.txt' % (args.split, args.tokenizer)
 )
@@ -177,4 +172,5 @@ print('Will write to file %s' % out_file, file=sys.stderr)
 with open(out_file, 'w') as f:
     for ex in process_dataset(dataset, args.tokenizer, args.workers):
         f.write(json.dumps(ex, ensure_ascii=False) + '\n')
+
 print('Total time: %.4f (s)' % (time.time() - t0))
