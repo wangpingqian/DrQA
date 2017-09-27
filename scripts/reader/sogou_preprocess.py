@@ -163,8 +163,6 @@ in_file = os.path.join(args.data_dir, args.split + '.json')
 print('Loading dataset %s' % in_file, file=sys.stderr)
 dataset = load_dataset(in_file)
 
-random.shuffle(dataset)
-
 out_file = os.path.join(
     args.out_dir, '%s-processed-%s.txt' % (args.split, args.tokenizer)
 )
