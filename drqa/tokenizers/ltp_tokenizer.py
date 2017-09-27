@@ -33,13 +33,15 @@ class LTPTokenizer(Tokenizer):
         normal_text = unicodedata.normalize('NFKC', text).replace('\\', ' ')
         #print(normal_text)
         normal_text = re.sub(r'[ \n\t]+', normal_text, ' ').strip()
-        if len(normal_text) == 0: print('empty line')
+        if len(normal_text) == 0:
+            print('EMPTY LINE: %s' % normal_text)
+            return "",None
         clean_text = normal_text.split(' ')
         words = [word for split in clean_text for word in list(self.segmentor.segment(split))]
-        #print(words)
         postags = list(self.postagger.postag(words))
-        #print(postags)
         netags = list(self.ne_recognizer.recognize(words, postags))
+        #print(words)
+        #print(postags)
         #print(netags)
         spans = []
         lemmas = []
@@ -60,7 +62,7 @@ class LTPTokenizer(Tokenizer):
         data = []
         for tup in zip(words, text_ws, spans, postags, lemmas, netags):
             data.append(tup)
-        return Tokens(data, self.annotators)
+        return normal_text,Tokens(data, self.annotators)
 
 if __name__ == '__main__':
     tokenizer = LTPTokenizer(**{'annotators': {'lemma', 'pos', 'ner'}})

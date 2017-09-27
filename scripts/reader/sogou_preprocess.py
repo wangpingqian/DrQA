@@ -27,14 +27,16 @@ TOK = None
 def init(tokenizer_class, options):
     global TOK
     TOK = tokenizer_class(**options)
-    Finalize(TOK, TOK.shutdown, exitpriority=100)
+    #Finalize(TOK, TOK.shutdown, exitpriority=100)
 
 
 def tokenize(text):
     """Call the global process tokenizer on the input text."""
     global TOK
-    tokens = TOK.tokenize(text)
+    normal_text, tokens = TOK.tokenize(text)
+    if tokens == None: return None
     output = {
+        'normal_text': normal_text,
         'words': tokens.words(),
         'offsets': tokens.offsets(),
         'pos': tokens.pos(),
@@ -55,8 +57,8 @@ def load_dataset(path):
               'contexts': [], 'qid2cid': []}
 
     with open(path) as f:
+        qaid = 100001
         for line in f:
-            qaid = 100001
             item = json.loads(line)
             if len(item['query']) == 0 or len(item['answer']) == 0: continue
             for passage in item['passages']:
@@ -85,32 +87,35 @@ def process_dataset(data, tokenizer, workers=None):
     """Iterate processing (tokenize, parse, etc) dataset multithreaded."""
     tokenizer_class = tokenizers.get_class(tokenizer)
     init(tokenizer_class,  {'annotators': {'lemma'}})
-    #make_pool = partial(Pool, workers, initializer=init)
-    #workers1 = make_pool(initargs=(tokenizer_class, {'annotators': {'lemma'}}))
-    #q_tokens = workers1.map(tokenize, data['questions'])
-    #workers1.close()
-    #workers1.join()
-    print("tokenizing questions and contexts ...")
     q_tokens = []
     c_tokens = []
-    for idx in range(len(data['questions'])):
-        question = data['questions'][idx]
-        context = data['contexts'][idx]
-        if len(question) == 0 or len(context) == 0:
-          continue
-        print(type(tokenize(question)))
-        print(type(tokenize(context)))
-        q_tokens.append(tokenize(question))
-        c_tokens.append(tokenize(context))
+    print("tokenizing questions ...")
+    make_pool = partial(Pool, workers, initializer=init)
+    workers1 = make_pool(initargs=(tokenizer_class, {'annotators': {'lemma'}}))
+    q_tokens = workers1.map(tokenize, data['questions'])
+    workers1.close()
+    workers1.join()
+    #for idx in range(len(data['questions'])):
+    #    question = data['questions'][idx]
+    #    context = data['contexts'][idx]
+    #    if len(question) == 0 or len(context) == 0:
+    #      continue
+    #    q_tokens.append(tokenize(question))
+    #    c_tokens.append(tokenize(context))
 
-    #workers2 = make_pool(
-    #    initargs=(tokenizer_class, {'annotators': {'lemma', 'pos', 'ner'}})
-    #)
-    #c_tokens = workers2.map(tokenize, data['contexts'])
-    #workers2.close()
-    #workers2.join()
+    print("tokenizing contexts ...")
+    workers2 = make_pool(
+        initargs=(tokenizer_class, {'annotators': {'lemma', 'pos', 'ner'}})
+    )
+    c_tokens = workers2.map(tokenize, data['contexts'])
+    workers2.close()
+    workers2.join()
     assert(len(q_tokens) == len(c_tokens))
     for idx in range(len(q_tokens)):
+        if q_tokens[idx] == None  or c_tokens[data['qid2cid'][idx]] == None:
+            continue
+        normal_question = q_tokens[idx]['normal_text']
+        normal_context = c_tokens[data['qid2cid'][idx]]['normal_text']
         question = q_tokens[idx]['words']
         qlemma =   q_tokens[idx]['lemma']
         document = c_tokens[data['qid2cid'][idx]]['words']
@@ -120,6 +125,7 @@ def process_dataset(data, tokenizer, workers=None):
         ner =   c_tokens[data['qid2cid'][idx]]['ner']
         ans_tokens = []
         ans = data['answers'][idx]  # answer the text
+        print(ans)
         ans_start = data['contexts'][idx].find(ans)
         ans_end = ans_start + len(ans)
         found = find_answer(offsets, ans_start, ans_end)
@@ -135,6 +141,9 @@ def process_dataset(data, tokenizer, workers=None):
               'lemma': lemma,
               'pos': pos,
               'ner': ner,
+              'normal_question': normal_question,
+              'normal_context': normal_context,
+              'text_answer': ans
             }
 
 
@@ -145,13 +154,13 @@ def process_dataset(data, tokenizer, workers=None):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', type=str, help='Path to sogouqa data directory',
-                    default='/DrQA/data/sogouqa')
+                    default='/var/yr/zhouxiang/DrQA/data/sogouqa')
 parser.add_argument('--out_dir', type=str, help='Path to output file dir',
-                    default='/DrQA/data/sogouqa')
+                    default='/var/yr/zhouxiang/DrQA/data/sogouqa')
 parser.add_argument('--split', type=str, help='Filename for train/dev split',
                     default='train_factoid_1')
                     #default='examples')
-parser.add_argument('--workers', type=int, default=1)
+parser.add_argument('--workers', type=int, default=None)
 parser.add_argument('--tokenizer', type=str, default='ltp')
 args = parser.parse_args()
 

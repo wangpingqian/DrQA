@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import numpy as np
 import logging
 import copy
+import codecs
 
 from torch.autograd import Variable
 from .config import override_model_args
@@ -88,7 +89,7 @@ class DocReader(object):
         # Return added words
         return to_add
 
-    def load_embeddings(self, words, embedding_file):
+    def load_embeddings(self, words, embedding_file, word2vec=False):
         """Load pretrained embeddings for a given list of words, if they exist.
 
         Args:
@@ -103,10 +104,15 @@ class DocReader(object):
 
         # When normalized, some words are duplicated. (Average the embeddings).
         vec_counts = {}
-        with open(embedding_file) as f:
+        with codecs.open(embedding_file, encoding='utf-8', errors='ignore') as f:
+            if word2vec:
+                meta_line = f.readline()
             for line in f:
                 parsed = line.rstrip().split(' ')
-                assert(len(parsed) == embedding.size(1) + 1)
+                # assert(len(parsed) == embedding.size(1) + 1)
+                if (len(parsed) != embedding.size(1) + 1):
+                  print(line)
+                  continue
                 w = self.word_dict.normalize(parsed[0])
                 if w in words:
                     vec = torch.Tensor([float(i) for i in parsed[1:]])
